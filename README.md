@@ -53,14 +53,13 @@ reporte-dda-col/
 │       # - Resuelve rutas relativas en desarrollo y en .exe (PyInstaller)
 └── vista/
 |   └── logger.py                # Registro de eventos:
-|        # - Escribe logs INFO y ERROR en archivo .log
+|        # - Escribe logs INFO y ERROR en archivo log.txt
 |        # - Formato: timestamp - nivel - mensaje
 |        # - Usado por todas las capas del sistema
 └── Log/
 |   └── log.txt                                  # Almacenamiento de logs
 |
-└── Recursos                                     # Se guardan los archivos que se descargan desde el ftp y se genera el archivo de excel que se envía porcorreo
-    ├── CDM.CSV                                 
+└── Recursos                                     # Se guardan los archivos que descargamos.                     
     └── ecxel.xlsx
 ```
 ## Instalación y configuración
