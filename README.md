@@ -63,7 +63,7 @@ reporte-dda-col/
     ├── CDM.CSV                                 
     └── ecxel.xlsx
 ```
-## ⚙️ Instalación y configuración
+## Instalación y configuración
 
 ### 1. Clonar el repositorio
 
@@ -118,10 +118,4 @@ pyinstaller --onefile main.py
 
 El `.exe` resultante puede desplegarse en cualquier servidor Windows sin necesidad de instalar Python ni las dependencias.
 
----
 
-##  Autor
-
-**Mauricio Berbel Mercado**  
-Técnico de Sistemas de Información — Positivo S+  
-[LinkedIn](https://linkedin.com/in/tu-perfil) · [GitHub](https://github.com/berbelmercado)
