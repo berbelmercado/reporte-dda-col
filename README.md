@@ -6,15 +6,17 @@ Sistema de automatización ETL que extrae el reporte de vehículos entregados po
 
 ## ¿Qué hace este proyecto?
 
-Automatiza un proceso que anteriormente requería acceso manual al portal web de SOFASA, descarga del reporte, y carga manual de datos. El sistema realiza el ciclo completo de forma desatendida:
+Este sistema automatiza de principio a fin el ciclo de obtención y procesamiento del **reporte DDA** (vehículos entregados por concesionarios a clientes finales).  
+Lo que antes era un proceso manual y repetitivo, ahora se ejecuta de forma desatendida y confiable:
 
-1. **Autenticación y navegación web** mediante Selenium en el portal de reportes
-2. **Descarga del reporte DDA** (vehículos entregados por concesionarios)
-3. **Procesamiento y transformación** de los datos con Pandas
-4. **Persistencia en SQL Server** para disponibilidad en reportería downstream
-5. **Empaquetado como ejecutable** para despliegue en servidores Windows sin Python
-6. **Generación de log** Para seguimiento en caso de errores
----
+-  **Autenticación automática** en el portal de reportes corporativo mediante Selenium.  
+-  **Descarga programada del reporte DDA**, evitando la intervención manual.  
+-  **Transformación de datos con Pandas**, validando la calidad del archivo y filtrando únicamente la información relevante (entregas efectivas).  
+-  **Persistencia en SQL Server**, con inserciones masivas optimizadas y lógica delta para garantizar que solo se almacenen VINs nuevos.  
+-  **Empaquetado como ejecutable**, lo que permite desplegar el sistema en servidores Windows sin necesidad de instalar Python ni librerías adicionales.  
+-  **Generación de logs centralizados**, facilitando el monitoreo y la trazabilidad de errores en todas las capas.  
+
+En resumen, el proyecto convierte un flujo manual y propenso a errores en un **pipeline ETL robusto, automatizado y listo para producción**, asegurando que la información esté disponible de manera oportuna para análisis y reportería.
 
 ## Arquitectura
 
