@@ -20,58 +20,39 @@ Automatiza un proceso que anteriormente requería acceso manual al portal web de
 
 El proyecto aplica una arquitectura en capas con separación clara de responsabilidades. Cada capa tiene una única función y se comunica únicamente con las capas adyacentes.
 
----
-
-## Flujo de datos
-
-1. **main.py**
-   - Llama a `etl_dda_controlador.procesar_reporte_dda()`
-
-2. **Descarga del archivo**
-   - Hasta N intentos con `ClienteSelenium.descargar_archivo_dda()`
-   - Pasos:
-     - Login en SPOTFIRE (IPN + clave)
-     - Navegación por carpetas: `DA3 → DESING → COL → REPORTS → IN PROGRESS → DDA`
-     - Context-click → Exportar → Descargar archivo Excel
-   - Retorna:
-     - `{"estado": True}` si éxito
-     - `{"estado": False, "error": "..."}` si falla
-
-3. **Procesamiento del archivo**
-   - `ProcesarArchivo.leer_modificar_archivo()`
-     - Valida que el archivo no esté vacío
-     - Lee Excel con Pandas → filtra `Process == "Delivery"`
-
-4. **Inserción en base de datos**
-   - `InsertaDatos.conexion_sql()` → pyodbc → SQL Server (ODBC Driver 17)
-   - `InsertaDatos.insertar_datos(dataframe)`
-     - `INSERT INTO reporte_dda_temp (VIN, End_Date)`
-     - Delta: `INSERT INTO reporte_dda WHERE vin NOT IN reporte_dda`
-     - `DELETE reporte_dda_temp`
-
-5. **Post-proceso**
-   - Elimina el archivo Excel descargado
-
----
-
-## Utilidades transversales
-- **Logger**: activo en todas las capas → escribe en archivo `.log`
-- **Resolver rutas**: activo en todas las capas → compatibilidad `.py` / `.exe`
-
-
-## Tecnologías utilizadas
-
-| Tecnología | Uso |
-|---|---|
-| **Python 3.x** | Lenguaje principal |
-| **Selenium** | Automatización del navegador y descarga del reporte |
-| **Pandas** | Transformación y procesamiento del archivo descargado |
-| **pyodbc** | Conexión y persistencia en SQL Server |
-| **webdriver-manager** | Gestión automática del ChromeDriver |
-| **python-dotenv** | Configuración segura mediante variables de entorno |
-| **PyInstaller** | Generación de ejecutable `.exe` para producción |
-
----
+reporte-dda-col/
+├── main.py                      # Punto de entrada: carga .env y dispara el pipeline
+├── controlador/
+│   └── lectura_archivo_controlador.py  # Orquesta el pipeline completo:
+│       # - Reintenta la descarga N veces (configurable vía .env)
+│       # - Delega a ClienteSelenium y ProcesarArchivo
+├── infraestructura/
+│   └── cliente_selenium.py      # Automatización del navegador:
+│       # - Login en portal SPOTFIRE (IPN + clave)
+│       # - Navegación por 7 niveles de carpetas
+│       # - Descarga del reporte DDA vía context-click
+│       # - Manejo de SSL no seguro y cambio de ventana
+│       # - Reintentos ante DOM inestable (StaleElementReference)
+├── modelo/
+│   ├── procesar_archivo.py      # Transformación ETL:
+│   │   # - Valida que el archivo no esté vacío
+│   │   # - Lee el Excel con Pandas
+│   │   # - Filtra filas con Process == "Delivery"
+│   │   # - Extrae columnas VIN y End_Date
+│   │   # - Elimina el archivo tras procesarlo
+│   └── inserta_datos.py         # Persistencia en SQL Server:
+│       # - Conexión vía pyodbc (ODBC Driver 17)
+│       # - Inserción masiva con fast_executemany
+│       # - Lógica delta: inserta solo VINs nuevos
+│       # - Limpia tabla temporal tras cada ejecución
+├── servicios/
+│   └── resolver_rutas.py        # Utilidad transversal:
+│       # - Resuelve rutas relativas en desarrollo y en .exe (PyInstaller)
+└── vista/
+    └── logger.py                # Registro de eventos:
+        # - Escribe logs INFO y ERROR en archivo .log
+        # - Formato: timestamp - nivel - mensaje
+        # - Usado por todas las capas del sistema
 
 ## ⚙️ Instalación y configuración
 
