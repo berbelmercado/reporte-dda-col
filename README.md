@@ -18,21 +18,48 @@ Automatiza un proceso que anteriormente requería acceso manual al portal web de
 
 ## Arquitectura
 
-El proyecto aplica separación de responsabilidades en capas bien definidas:
-│
-├── main.py                    # Punto de entrada y orquestador
-├── requerimientos.txt         # Dependencias del proyecto
-├── .gitignore
-│
-├── controlador/               # Lógica de negocio y orquestación ETL
-├── modelo/                    # Acceso a datos — SQL Server (pyodbc)
-├── servicios/                 # Utilidades transversales (resolución de rutas, etc.)
-├── infraestructura/           # Configuración de drivers y entorno
-└── vista/                     # Capa de presentación / logging
+El proyecto aplica una arquitectura en capas con separación clara de responsabilidades. Cada capa tiene una única función y se comunica únicamente con las capas adyacentes.
 
 ---
 
-## 🛠️ Tecnologías utilizadas
+## Flujo de datos
+
+1. **main.py**
+   - Llama a `etl_dda_controlador.procesar_reporte_dda()`
+
+2. **Descarga del archivo**
+   - Hasta N intentos con `ClienteSelenium.descargar_archivo_dda()`
+   - Pasos:
+     - Login en SPOTFIRE (IPN + clave)
+     - Navegación por carpetas: `DA3 → DESING → COL → REPORTS → IN PROGRESS → DDA`
+     - Context-click → Exportar → Descargar archivo Excel
+   - Retorna:
+     - `{"estado": True}` si éxito
+     - `{"estado": False, "error": "..."}` si falla
+
+3. **Procesamiento del archivo**
+   - `ProcesarArchivo.leer_modificar_archivo()`
+     - Valida que el archivo no esté vacío
+     - Lee Excel con Pandas → filtra `Process == "Delivery"`
+
+4. **Inserción en base de datos**
+   - `InsertaDatos.conexion_sql()` → pyodbc → SQL Server (ODBC Driver 17)
+   - `InsertaDatos.insertar_datos(dataframe)`
+     - `INSERT INTO reporte_dda_temp (VIN, End_Date)`
+     - Delta: `INSERT INTO reporte_dda WHERE vin NOT IN reporte_dda`
+     - `DELETE reporte_dda_temp`
+
+5. **Post-proceso**
+   - Elimina el archivo Excel descargado
+
+---
+
+## Utilidades transversales
+- **Logger**: activo en todas las capas → escribe en archivo `.log`
+- **Resolver rutas**: activo en todas las capas → compatibilidad `.py` / `.exe`
+
+
+## Tecnologías utilizadas
 
 | Tecnología | Uso |
 |---|---|
