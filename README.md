@@ -52,10 +52,16 @@ reporte-dda-col/
 │   └── resolver_rutas.py        # Utilidad transversal:
 │       # - Resuelve rutas relativas en desarrollo y en .exe (PyInstaller)
 └── vista/
-    └── logger.py                # Registro de eventos:
-        # - Escribe logs INFO y ERROR en archivo .log
-        # - Formato: timestamp - nivel - mensaje
-        # - Usado por todas las capas del sistema
+|   └── logger.py                # Registro de eventos:
+|        # - Escribe logs INFO y ERROR en archivo .log
+|        # - Formato: timestamp - nivel - mensaje
+|        # - Usado por todas las capas del sistema
+└── Log/
+|   └── log.txt                                  # Almacenamiento de logs
+|
+└── Recursos                                     # Se guardan los archivos que se descargan desde el ftp y se genera el archivo de excel que se envía porcorreo
+    ├── CDM.CSV                                 
+    └── ecxel.xlsx
 ```
 ## ⚙️ Instalación y configuración
 
