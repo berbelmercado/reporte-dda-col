@@ -20,6 +20,7 @@ Automatiza un proceso que anteriormente requería acceso manual al portal web de
 
 El proyecto aplica una arquitectura en capas con separación clara de responsabilidades. Cada capa tiene una única función y se comunica únicamente con las capas adyacentes.
 
+```text
 reporte-dda-col/
 ├── main.py                      # Punto de entrada: carga .env y dispara el pipeline
 ├── controlador/
@@ -53,7 +54,7 @@ reporte-dda-col/
         # - Escribe logs INFO y ERROR en archivo .log
         # - Formato: timestamp - nivel - mensaje
         # - Usado por todas las capas del sistema
-
+```
 ## ⚙️ Instalación y configuración
 
 ### 1. Clonar el repositorio
