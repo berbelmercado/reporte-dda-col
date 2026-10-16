@@ -84,17 +84,46 @@ pip install -r requerimientos.txt
 Crea un archivo `.env` en la raíz del proyecto:
 
 ```env
-# Credenciales del portal web
-PORTAL_URL=https://portal.sofasa.com
-PORTAL_USER=tu_usuario
-PORTAL_PASSWORD=tu_contraseña
+# General
+INTENTOS_DESCARGA=3
+DESCARGA_REPORTE=Recursos
+ARCHIVO_LOG=Log/log.txt
+RUTA_WEBDRIVER=chromedriver.exe
+SSL_VERIFY=True
+
+# Portal Spotfire: URL y credenciales
+RUTA_SPOTFIRE=https://portal.sofasa.com
+IPN=tu_ipn
+CLAVE=tu_contraseña
+
+# Portal Spotfire: selectores del login
+ID_INPUT_IPN=id_campo_ipn
+ID_INPUT_CLAVE=id_campo_clave
+XPATH_SIGUIENTE=xpath_boton_siguiente
+XPATH_INGRESAR_CLAVE=xpath_opcion_clave
+XPATH_VERIFICAR=xpath_boton_verificar
+
+# Portal Spotfire: XPaths de la ruta de carpetas hasta el reporte (en orden)
+XPATH_CARPETA_DA3=xpath_carpeta_da3
+XPATH_CARPETA_DESING=xpath_carpeta_desing
+XPATH_CARPETA_COL=xpath_carpeta_col
+XPATH_CARPETA_REPORTS=xpath_carpeta_reports
+XPATH_REPORTS_IN_PROGRES=xpath_carpeta_reports_in_progress
+XPATH_CARPETA_DDA=xpath_carpeta_dda
+XPATH_CARP_COL_DS_DDA_COLOMBIA=xpath_reporte_ds_dda_colombia
 
 # SQL Server
-DB_SERVER=tu_servidor
-DB_NAME=tu_base_de_datos
-DB_USER=usuario_db
-DB_PASSWORD=contraseña_db
+SERVIDOR_SQL=tu_servidor
+BD_DATASTEWARD=tu_base_de_datos
+USUARIO_SQL=usuario_db
+CONTRASENA_SQL=contraseña_db
 ```
+
+- `INTENTOS_DESCARGA`: número de reintentos de descarga.
+- `DESCARGA_REPORTE`: carpeta donde Chrome guarda el reporte descargado.
+- `ARCHIVO_LOG`: ruta del archivo de log.
+- `RUTA_WEBDRIVER`: chromedriver local, usado solo si `webdriver-manager` no logra descargar uno.
+- `SSL_VERIFY`: con `True`, activa la ventana de Chrome para el aviso del certificado de cliente.
 
 >  El archivo `.env` está excluido por `.gitignore`. Nunca lo subas al repositorio.
 >  Crear la carpeta Log
