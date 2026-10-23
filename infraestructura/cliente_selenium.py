@@ -61,7 +61,7 @@ class ClienteSelenium:
         driver = None
         try:
             inicio = time.monotonic()
-            self._limpiar_descargas_parciales()
+            self._vaciar_carpeta_descarga()
             driver = webdriver.Chrome(
                 service=self._crear_servicio_driver(), options=self._crear_opciones()
             )
@@ -102,6 +102,8 @@ class ClienteSelenium:
 
             self._abrir_menu_tabla(driver, wait, acciones)
 
+            # Lo que ya esté en la carpeta antes de exportar no cuenta como la descarga
+            previos = set(self._archivos_descarga())
             wait.until(
                 EC.element_to_be_clickable(
                     (By.XPATH, "/html/body/div[2]/div[1]/div[1]/div")
@@ -114,7 +116,7 @@ class ClienteSelenium:
             ).click()
             self._marcar_tiempo("Exportación solicitada", inicio)
 
-            self._esperar_descarga()
+            self._esperar_descarga(previos)
             self._marcar_tiempo("Descarga completa", inicio)
             driver.quit()
             return {"estado": True}
@@ -276,19 +278,45 @@ class ClienteSelenium:
     def _es_parcial(nombre):
         return nombre.endswith((".crdownload", ".tmp"))
 
-    def _limpiar_descargas_parciales(self):
-        """Borra descargas incompletas que haya dejado un intento anterior."""
-        for nombre in self._archivos_descarga():
-            if self._es_parcial(nombre):
-                remove(path.join(self.__ruta_descarga_reporte, nombre))
-                self.obj_log.log(f"Se elimina descarga incompleta: {nombre}")
+    def _describir_archivos(self, nombres):
+        ruta = self.__ruta_descarga_reporte
+        return ", ".join(
+            f"{n} ({path.getsize(path.join(ruta, n))} bytes)" for n in sorted(nombres)
+        )
 
-    def _esperar_descarga(self):
-        """Espera a que haya un archivo completo y ninguno a medio descargar."""
+    def _vaciar_carpeta_descarga(self):
+        """Borra todo lo que haya en la carpeta de descarga antes de un intento.
+
+        Así solo puede quedar el archivo que se descargue en este intento. Las
+        subcarpetas (como rechazados) no se tocan.
+        """
+        archivos = self._archivos_descarga()
+        if not archivos:
+            return
+        self.obj_log.log(
+            f"Se vacía la carpeta de descarga: {self._describir_archivos(archivos)}"
+        )
+        for nombre in archivos:
+            remove(path.join(self.__ruta_descarga_reporte, nombre))
+
+    def _esperar_descarga(self, previos):
+        """Espera a que aparezca un archivo nuevo completo y ninguno a medio descargar.
+
+        Parámetros:
+        -----------
+        previos : set
+            Archivos que ya estaban en la carpeta antes de exportar.
+        """
         limite = time.time() + _WAIT_DOWNLOAD
         while time.time() < limite:
             archivos = self._archivos_descarga()
-            if archivos and not any(self._es_parcial(a) for a in archivos):
+            nuevos = [a for a in archivos if a not in previos and not self._es_parcial(a)]
+            if nuevos and not any(self._es_parcial(a) for a in archivos):
+                if len(archivos) > 1:
+                    self.obj_log.log(
+                        f"Hay más de un archivo en la carpeta de descarga: "
+                        f"{self._describir_archivos(archivos)}"
+                    )
                 return
             time.sleep(1)
         raise TimeoutError(f"La descarga no terminó en {_WAIT_DOWNLOAD} segundos")

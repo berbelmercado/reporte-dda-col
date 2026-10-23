@@ -23,8 +23,12 @@ Dependencias:
 import pandas as pd
 from vista.logger import Logger
 from servicios.resolver_rutas import resource_path
-from os import getenv, listdir, path, remove
+from datetime import datetime
+from os import getenv, listdir, makedirs, path, remove, replace
 from modelo.inserta_datos import InsertaDatos
+
+_CARPETA_RECHAZADOS = "rechazados"
+_BYTES_DIAGNOSTICO = 64
 
 
 class ProcesarArchivo:
@@ -68,16 +72,16 @@ class ProcesarArchivo:
             self.obj_log.error(f"No se encontró ningún archivo en {self.recursos}\n")
             return False
 
-        # Si el archivo no sirve se elimina igual, para que no lo vuelva a leer la próxima corrida
+        # Si el archivo no sirve se aparta en "rechazados" para revisarlo sin volver a leerlo
         if self.archivo_vacio():
-            self.eliminar_archivo()
+            self.rechazar_archivo()
             return False
 
         try:
             self.leer_archivo()
         except Exception as ex:
             self.obj_log.error(f"Error al leer el archivo: {ex}\n")
-            self.eliminar_archivo()
+            self.rechazar_archivo()
             return False
 
         return self.procesar_archivo()
@@ -101,7 +105,9 @@ class ProcesarArchivo:
         Lee el archivo de reporte y lo carga en un DataFrame.
         """
         self.dataframe = pd.read_excel(self.archivo_reporte)
-        self.obj_log.log("Se lee correctamente el archivo")
+        self.obj_log.log(
+            f"Se lee correctamente el archivo {path.basename(self.archivo_reporte)}"
+        )
 
     def procesar_archivo(self) -> bool:
         """
@@ -144,8 +150,46 @@ class ProcesarArchivo:
             # Registramos log
             self.obj_log.error(f"Error al eliminar el archivo {err}\n")
 
+    def rechazar_archivo(self):
+        """
+        Mueve el archivo que no se pudo usar a la subcarpeta "rechazados" y registra
+        su nombre, tamaño y primeros bytes para poder diagnosticar qué se descargó.
+        """
+        try:
+            nombre = path.basename(self.archivo_reporte)
+            tamano = path.getsize(self.archivo_reporte)
+            with open(self.archivo_reporte, "rb") as archivo:
+                inicio = archivo.read(_BYTES_DIAGNOSTICO)
+            self.obj_log.error(
+                f"Archivo rechazado: {nombre} ({tamano} bytes). Primeros bytes: {inicio!r}"
+            )
+            carpeta = path.join(self.recursos, _CARPETA_RECHAZADOS)
+            makedirs(carpeta, exist_ok=True)
+            destino = path.join(carpeta, f"{datetime.now():%Y%m%d_%H%M%S}_{nombre}")
+            replace(self.archivo_reporte, destino)
+            self.obj_log.log(f"El archivo se movió a {destino}\n")
+        except Exception as err:
+            self.obj_log.error(f"Error al mover el archivo a rechazados: {err}\n")
+            self.eliminar_archivo()
+
     def listar_archivos(self, recursos) -> str:
-        for elemento in listdir(recursos):
-            ruta_completa = path.join(recursos, elemento)
-            if path.isfile(ruta_completa):
-                return ruta_completa
+        """
+        Devuelve el archivo más reciente de la carpeta (sin entrar en subcarpetas),
+        o None si no hay ninguno. Si hay varios, los registra en el log.
+        """
+        archivos = [
+            path.join(recursos, elemento)
+            for elemento in listdir(recursos)
+            if path.isfile(path.join(recursos, elemento))
+        ]
+        if not archivos:
+            return None
+        if len(archivos) > 1:
+            detalle = ", ".join(
+                f"{path.basename(a)} ({path.getsize(a)} bytes)" for a in sorted(archivos)
+            )
+            self.obj_log.log(f"Hay varios archivos en {recursos}: {detalle}")
+        elegido = max(archivos, key=path.getmtime)
+        if len(archivos) > 1:
+            self.obj_log.log(f"Se usa el más reciente: {path.basename(elegido)}")
+        return elegido
