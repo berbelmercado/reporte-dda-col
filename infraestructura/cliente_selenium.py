@@ -10,18 +10,18 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import StaleElementReferenceException
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 
 from webdriver_manager.chrome import ChromeDriverManager
 from servicios.resolver_rutas import resource_path
 from vista.logger import Logger
 
 
-_WAIT_IMPLICIT = 30
 _WAIT_SHORT = 3
-_WAIT_LOGIN = 10
 _WAIT_DOWNLOAD = 120  # máximo para que termine la descarga
 _WAIT_EXPLICIT = 30
+_WAIT_TABLA = 10  # tras el primer clic en el reporte, antes de repetirlo
+_REINTENTOS_CLIC = 3
 
 
 class ClienteSelenium:
@@ -60,15 +60,18 @@ class ClienteSelenium:
     def descargar_archivo_dda(self) -> dict:
         driver = None
         try:
+            inicio = time.monotonic()
             self._limpiar_descargas_parciales()
             driver = webdriver.Chrome(
                 service=self._crear_servicio_driver(), options=self._crear_opciones()
             )
-            driver.implicitly_wait(_WAIT_IMPLICIT)
+            # Sin espera implícita: todas las búsquedas usan esperas explícitas.
+            # Mezclar ambas hacía que validar_exitencia tardara hasta 30 s en vez de 3.
             self._permitir_descargas(driver)
 
             wait = WebDriverWait(driver, _WAIT_EXPLICIT)
             acciones = ActionChains(driver)
+            self._marcar_tiempo("Navegador iniciado", inicio)
 
             driver.get(self.url_sopotfire)
             self._aceptar_sitio_no_seguro(driver)
@@ -79,8 +82,7 @@ class ClienteSelenium:
                 )
             ).click()
 
-            time.sleep(_WAIT_LOGIN)
-
+            # La espera explícita del campo IPN cubre la redirección al login
             wait.until(
                 EC.presence_of_element_located((By.ID, self.input_ipn))
             ).send_keys(self.ipn)
@@ -90,31 +92,15 @@ class ClienteSelenium:
                 EC.presence_of_element_located((By.ID, self.input_clave))
             ).send_keys(self.clave)
             wait.until(EC.element_to_be_clickable((By.XPATH, self.verificar))).click()
+            self._marcar_tiempo("Login completado", inicio)
 
             self._navegar_carpetas(wait, acciones)
             self._cambiar_ventana(driver)
 
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            time.sleep(2)
+            self._marcar_tiempo("Reporte abierto", inicio)
 
-            wait.until(
-                EC.element_to_be_clickable(
-                    (
-                        By.XPATH,
-                        "/html/body/div/div[2]/div/div[1]/div/div/div[1]/div/div[1]/div/div/div[2]/div[1]/div[1]/div[2]",
-                    )
-                )
-            ).click()
-
-            self.context_click_safe(
-                wait,
-                acciones,
-                (
-                    By.XPATH,
-                    "/html/body/div[1]/div[2]/div/div[1]/div/div/div[1]/div/div[2]"
-                    "/div/div/div/div/div/div/div/div/div[1]/div[1]",
-                ),
-            )
+            self._abrir_menu_tabla(driver, wait, acciones)
 
             wait.until(
                 EC.element_to_be_clickable(
@@ -126,8 +112,10 @@ class ClienteSelenium:
                     (By.XPATH, "/html/body/div[3]/div[1]/div[2]/div")
                 )
             ).click()
+            self._marcar_tiempo("Exportación solicitada", inicio)
 
             self._esperar_descarga()
+            self._marcar_tiempo("Descarga completa", inicio)
             driver.quit()
             return {"estado": True}
 
@@ -181,6 +169,37 @@ class ClienteSelenium:
         ]
         for ruta in rutas:
             self.double_click_safe(wait, acciones, (By.XPATH, ruta))
+
+    def _abrir_menu_tabla(self, driver, wait, acciones):
+        """Selecciona la tabla del reporte y abre su menú contextual.
+
+        Reemplaza la pausa fija de 2 s antes del primer clic: si Spotfire aún no
+        respondió y la tabla no aparece, se repite el clic en vez de esperar siempre.
+        """
+        primer_clic = (
+            By.XPATH,
+            "/html/body/div/div[2]/div/div[1]/div/div/div[1]/div/div[1]/div/div/div[2]/div[1]/div[1]/div[2]",
+        )
+        tabla = (
+            By.XPATH,
+            "/html/body/div[1]/div[2]/div/div[1]/div/div/div[1]/div/div[2]"
+            "/div/div/div/div/div/div/div/div/div[1]/div[1]",
+        )
+        for intento in range(1, _REINTENTOS_CLIC + 1):
+            try:
+                wait.until(EC.element_to_be_clickable(primer_clic)).click()
+                WebDriverWait(driver, _WAIT_TABLA).until(EC.element_to_be_clickable(tabla))
+                break
+            except (TimeoutException, StaleElementReferenceException):
+                if intento == _REINTENTOS_CLIC:
+                    raise
+                self.obj_log.log(
+                    f"La tabla del reporte aún no responde, se repite el clic ({intento})"
+                )
+        self.context_click_safe(wait, acciones, tabla)
+
+    def _marcar_tiempo(self, etapa, inicio):
+        self.obj_log.log(f"{etapa} ({time.monotonic() - inicio:.0f} s)")
 
     def _cambiar_ventana(self, driver):
         original = driver.current_window_handle
