@@ -39,13 +39,13 @@ Cross-cutting:
 Gotchas:
 - `DESCARGA_REPORTE` must hold only the downloaded report. `listar_archivos` picks the first file `os.listdir` returns, so any leftover file (for example a partial `.crdownload`) gets read and then deleted. If the folder is empty it returns `None`, and `archivo_vacio()` raises outside any `try`, so that is the one path that crashes instead of logging.
 - The temp-table insert is positional (`VALUES (?,?)`), so the DataFrame column order `VIN, End_Date` must match the column order of `reporte_dda_temp` (`vin, fecha_entrega`).
-- Behind the corporate proxy, `ChromeDriverManager().install()` can time out (`WinError 10060`) before it falls back to `RUTA_WEBDRIVER`. Keep a chromedriver that matches the installed Chrome version at that path.
+- Behind the corporate proxy without `PROXY_HOST`, `ChromeDriverManager().install()` times out (`WinError 10060`) before it falls back to `RUTA_WEBDRIVER`. Even with the proxy set, keep a chromedriver that matches the installed Chrome version at that path.
 
 ## Configuration (.env)
 
 The README has a full `.env` template. Variables read by the code:
 
-- General: `INTENTOS_DESCARGA`, `DESCARGA_REPORTE` (download dir, e.g. `Recursos`), `ARCHIVO_LOG` (e.g. `Log/log.txt`), `RUTA_WEBDRIVER`, `SSL_VERIFY` (`"True"` to activate the Chrome window for the client-certificate prompt via pygetwindow)
+- General: `INTENTOS_DESCARGA`, `DESCARGA_REPORTE` (download dir, e.g. `Recursos`), `ARCHIVO_LOG` (e.g. `Log/log.txt`), `RUTA_WEBDRIVER`, `SSL_VERIFY` (`"True"` to activate the Chrome window for the client-certificate prompt via pygetwindow), `PROXY_HOST` (optional `host:port`; the chromedriver download goes through it with `IPN`/`CLAVE`, set via `HTTPS_PROXY` only while it runs, because Selenium also reads that variable)
 - Portal: `RUTA_SPOTFIRE`, `IPN`, `CLAVE`, `ID_INPUT_IPN`, `ID_INPUT_CLAVE`, `XPATH_SIGUIENTE`, `XPATH_INGRESAR_CLAVE`, `XPATH_VERIFICAR`
 - Folder XPaths: `XPATH_CARPETA_DA3`, `XPATH_CARPETA_DESING`, `XPATH_CARPETA_COL`, `XPATH_CARPETA_REPORTS`, `XPATH_REPORTS_IN_PROGRES`, `XPATH_CARPETA_DDA`, `XPATH_CARP_COL_DS_DDA_COLOMBIA`
 - SQL Server: `SERVIDOR_SQL`, `USUARIO_SQL`, `CONTRASENA_SQL`, `BD_DATASTEWARD`

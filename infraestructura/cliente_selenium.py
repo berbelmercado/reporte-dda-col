@@ -1,5 +1,7 @@
 import time
-from os import getenv
+from contextlib import contextmanager
+from os import environ, getenv
+from urllib.parse import quote
 import pygetwindow as gw
 
 from selenium import webdriver
@@ -50,6 +52,7 @@ class ClienteSelenium:
         self.ipn = getenv("IPN")
         self.clave = getenv("CLAVE")
         self.validar_certificado = getenv("SSL_VERIFY")
+        self.proxy_host = getenv("PROXY_HOST")
 
         self.obj_log = Logger()
         self.obj_procesar_archivo = ProcesarArchivo()
@@ -192,13 +195,43 @@ class ClienteSelenium:
 
     def _crear_servicio_driver(self):
         try:
-            return Service(ChromeDriverManager().install())
+            with self._proxy_temporal():
+                return Service(ChromeDriverManager().install())
         except Exception as ex:
             self.obj_log.error(
                 f"No se pudo actualizar el webdriver automáticamente: {ex}. "
                 f"Se usa el driver local: {self.ruta_driver}"
             )
             return Service(executable_path=self.ruta_driver)
+
+    @contextmanager
+    def _proxy_temporal(self):
+        """Activa el proxy corporativo solo durante la descarga del webdriver.
+
+        Se restauran las variables al salir porque Selenium también las lee y
+        enviaría por el proxy su conexión local con chromedriver.
+        """
+        if not self.proxy_host:
+            yield
+            return
+
+        usuario = quote(self.ipn or "", safe="")
+        clave = quote(self.clave or "", safe="")
+        url_proxy = f"http://{usuario}:{clave}@{self.proxy_host}"
+        variables = ("HTTPS_PROXY", "HTTP_PROXY")
+        originales = {var: environ.get(var) for var in variables}
+
+        self.obj_log.log(f"Descargando webdriver a través del proxy {self.proxy_host}")
+        try:
+            for var in variables:
+                environ[var] = url_proxy
+            yield
+        finally:
+            for var, valor in originales.items():
+                if valor is None:
+                    environ.pop(var, None)
+                else:
+                    environ[var] = valor
 
     def _crear_opciones(self):
         options = Options()

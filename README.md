@@ -90,6 +90,7 @@ DESCARGA_REPORTE=Recursos
 ARCHIVO_LOG=Log/log.txt
 RUTA_WEBDRIVER=chromedriver.exe
 SSL_VERIFY=True
+PROXY_HOST=host_proxy:puerto
 
 # Portal Spotfire: URL y credenciales
 RUTA_SPOTFIRE=https://portal.sofasa.com
@@ -124,6 +125,7 @@ CONTRASENA_SQL=contraseña_db
 - `ARCHIVO_LOG`: ruta del archivo de log.
 - `RUTA_WEBDRIVER`: chromedriver local, usado solo si `webdriver-manager` no logra descargar uno.
 - `SSL_VERIFY`: con `True`, activa la ventana de Chrome para el aviso del certificado de cliente.
+- `PROXY_HOST`: proxy corporativo (`host:puerto`) para descargar el chromedriver, autenticado con `IPN`/`CLAVE`. Opcional: si está vacío, se descarga sin proxy.
 
 >  El archivo `.env` está excluido por `.gitignore`. Nunca lo subas al repositorio.
 >  Crear la carpeta Log
