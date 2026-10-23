@@ -64,3 +64,21 @@ class Logger:
             El mensaje de error a registrar.
         """
         logging.error(mensaje)
+
+    def inicio_ejecucion(self):
+        """
+        Marca el comienzo de una ejecución: deja una línea en blanco si el log
+        ya tiene contenido y registra un encabezado, para separar las corridas.
+        """
+        ruta = resource_path(os.getenv('ARCHIVO_LOG'))
+        if os.path.exists(ruta) and os.path.getsize(ruta) > 0:
+            with open(ruta, 'a') as archivo:
+                archivo.write('\n')
+        logging.info('========== Inicio de ejecución ==========')
+
+    def fin_ejecucion(self, exito):
+        """
+        Marca el final de una ejecución con su resultado.
+        """
+        resultado = 'exitosa' if exito else 'con errores'
+        logging.info(f'========== Fin de ejecución ({resultado}) ==========')

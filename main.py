@@ -21,13 +21,17 @@ if __name__ == "__main__":
 
     load_dotenv(resource_path(".env"))
     crear_carpetas()
+    obj_log = Logger()
+    obj_log.inicio_ejecucion()
 
     try:
         obj_controlador = etl_dda_controlador()
         exito = obj_controlador.procesar_reporte_dda()
     except Exception:
-        Logger().error(f"Error inesperado:\n{traceback.format_exc()}")
+        obj_log.error(f"Error inesperado:\n{traceback.format_exc()}")
         exito = False
+
+    obj_log.fin_ejecucion(exito)
 
     # Código de salida distinto de 0 para que el Programador de tareas marque el fallo
     sys.exit(0 if exito else 1)
