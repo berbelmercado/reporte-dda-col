@@ -13,8 +13,10 @@ python -m venv venv
 venv\Scripts\activate
 pip install -r requerimientos.txt
 python main.py                  # runs the full pipeline (needs .env, portal access and SQL Server)
-pyinstaller --onefile main.py   # production build, deployed as a Windows scheduled task
+pyinstaller main.spec           # production build, deployed as a Windows scheduled task
 ```
+
+The local `main.spec` (gitignored by `*.spec`) is a one-folder build (`COLLECT`, output in `dist/main/`) that bundles `.env` via `datas=[('.env', '.')]`. The README still says `pyinstaller --onefile main.py`; avoid that: it does not bundle `.env`, and in one-file mode `sys._MEIPASS` is a temp dir deleted on exit, so the log and download folder (resolved through `resource_path`) would vanish with it. In the one-folder build they live under `dist/main/_internal/`.
 
 There are no tests, linter config, or CI. The only way to exercise the pipeline end-to-end is a real run against the portal and database.
 
@@ -26,7 +28,7 @@ Layered (MVC-ish) structure; each class reads its own config from environment va
 
 Call flow:
 
-1. `main.py` → `load_dotenv(resource_path(".env"))` → `etl_dda_controlador.procesar_reporte_dda()`
+1. `main.py` → `load_dotenv(resource_path(".env"))` → `crear_carpetas()` (creates the `ARCHIVO_LOG` parent dir and `DESCARGA_REPORTE` if missing) → `etl_dda_controlador.procesar_reporte_dda()`
 2. `controlador/lectura_archivo_controlador.py` retries `ClienteSelenium.descargar_archivo_dda()` up to `INTENTOS_DESCARGA` times. That method returns a dict `{"estado": bool, "error"?: str}` instead of raising.
 3. `infraestructura/cliente_selenium.py` drives Chrome: login (IPN → next → choose password → password → verify), then double-clicks through 7 folder XPaths (`_navegar_carpetas`), switches to the new window, and exports the report via context menu into `DESCARGA_REPORTE`. Uses `ChromeDriverManager`, falling back to the local `RUTA_WEBDRIVER`. Some XPaths are hardcoded absolute paths in the method body. The rest come from env vars. Flow pacing relies on fixed `time.sleep` constants (`_WAIT_*`) plus `*_click_safe` retries on `StaleElementReferenceException`.
 4. `modelo/procesar_archivo.py` takes the **first file** found in the `DESCARGA_REPORTE` directory, keeps rows where `Process == "Delivery"` with columns `VIN`, `End_Date`, hands them to `InsertaDatos`, and **always deletes the file** in `finally`.
@@ -50,4 +52,4 @@ The README has a full `.env` template. Variables read by the code:
 - Folder XPaths: `XPATH_CARPETA_DA3`, `XPATH_CARPETA_DESING`, `XPATH_CARPETA_COL`, `XPATH_CARPETA_REPORTS`, `XPATH_REPORTS_IN_PROGRES`, `XPATH_CARPETA_DDA`, `XPATH_CARP_COL_DS_DDA_COLOMBIA`
 - SQL Server: `SERVIDOR_SQL`, `USUARIO_SQL`, `CONTRASENA_SQL`, `BD_DATASTEWARD`
 
-The `Log/` and `Recursos/` folders are not in git and must be created manually before running.
+The `Log/` and `Recursos/` folders are not in git; `main.py` creates them at startup.
