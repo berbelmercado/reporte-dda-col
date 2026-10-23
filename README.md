@@ -118,6 +118,12 @@ SERVIDOR_SQL=tu_servidor
 BD_DATASTEWARD=tu_base_de_datos
 USUARIO_SQL=usuario_db
 CONTRASENA_SQL=contraseña_db
+
+# Alerta por correo cuando una ejecución falla (relay SMTP sin usuario ni cifrado)
+CORREO_REMITENTE=remitente@dominio.com
+SERVIDOR_SMTP=ip_o_host_smtp
+PUERTO_SERVIDOR_SMTP=25
+DESTINATARIO=correo1@dominio.com,correo2@dominio.com
 ```
 
 - `INTENTOS_DESCARGA`: número de reintentos de descarga.
@@ -126,6 +132,8 @@ CONTRASENA_SQL=contraseña_db
 - `RUTA_WEBDRIVER`: chromedriver local, usado solo si `webdriver-manager` no logra descargar uno.
 - `PROXY_HOST`: proxy corporativo (`host:puerto`) para descargar el chromedriver, autenticado con `IPN`/`CLAVE`. Opcional: si está vacío, se descarga sin proxy.
 - `MODO_OCULTO`: con `True`, Chrome corre sin ventana (headless, 1920x1080). Así la tarea programada puede ejecutarse sin sesión iniciada. Use `False` para ver el navegador al depurar.
+- `CORREO_REMITENTE`, `SERVIDOR_SMTP`, `PUERTO_SERVIDOR_SMTP`: relay SMTP para la alerta de fallo. Se conecta sin usuario, sin contraseña y sin cifrado.
+- `DESTINATARIO`: uno o varios correos separados por coma. Si la ejecución termina con errores, se envía un solo correo con el log de esa corrida adjunto.
 
 >  El archivo `.env` está excluido por `.gitignore`. Nunca lo subas al repositorio.
 >  Crear la carpeta Log

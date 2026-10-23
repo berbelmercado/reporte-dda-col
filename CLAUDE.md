@@ -36,7 +36,7 @@ Call flow:
 
 Cross-cutting:
 - `servicios/resolver_rutas.resource_path` resolves paths against `sys._MEIPASS` when frozen by PyInstaller, else the CWD. Use it for every file path (`.env`, log, download dir, driver), and run from the repo root.
-- `vista/logger.Logger` wraps `logging.basicConfig` writing to `ARCHIVO_LOG`. `main.py` brackets each run with `inicio_ejecucion()` (a blank line plus a header) and `fin_ejecucion(exito)`. Errors are logged rather than raised. Each step returns a bool up to `main.py`, which exits with code 1 on failure (or on any unexpected exception, logged with its traceback) so the Task Scheduler history shows it. Check the log file for the cause.
+- `vista/logger.Logger` wraps `logging.basicConfig` writing to `ARCHIVO_LOG`. `main.py` brackets each run with `inicio_ejecucion()` (a blank line plus a header) and `fin_ejecucion(exito)`. When the run fails, before the end line, `infraestructura/cliente_correo.ClienteCorreo.enviar_alerta_fallo()` sends one email with `Logger.log_ejecucion_actual()` (the log lines since the last header) attached. A failed email is only logged and doesn't change the exit code. Errors are logged rather than raised. Each step returns a bool up to `main.py`, which exits with code 1 on failure (or on any unexpected exception, logged with its traceback) so the Task Scheduler history shows it. Check the log file for the cause.
 
 Gotchas:
 - `DESCARGA_REPORTE` must hold only the downloaded report. `listar_archivos` picks the first file `os.listdir` returns, so any leftover file (for example a partial `.crdownload`) gets read and then deleted. If the folder is empty it returns `None`, which is logged as an error.
@@ -51,5 +51,6 @@ The README has a full `.env` template. Variables read by the code:
 - Portal: `RUTA_SPOTFIRE`, `IPN`, `CLAVE`, `ID_INPUT_IPN`, `ID_INPUT_CLAVE`, `XPATH_SIGUIENTE`, `XPATH_INGRESAR_CLAVE`, `XPATH_VERIFICAR`
 - Folder XPaths: `XPATH_CARPETA_DA3`, `XPATH_CARPETA_DESING`, `XPATH_CARPETA_COL`, `XPATH_CARPETA_REPORTS`, `XPATH_REPORTS_IN_PROGRES`, `XPATH_CARPETA_DDA`, `XPATH_CARP_COL_DS_DDA_COLOMBIA`
 - SQL Server: `SERVIDOR_SQL`, `USUARIO_SQL`, `CONTRASENA_SQL`, `BD_DATASTEWARD`
+- Failure email: `CORREO_REMITENTE`, `SERVIDOR_SMTP`, `PUERTO_SERVIDOR_SMTP` (plain SMTP relay, no login, no TLS), `DESTINATARIO` (comma-separated list)
 
 The `Log/` and `Recursos/` folders are not in git; `main.py` creates them at startup.

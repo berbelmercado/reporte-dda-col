@@ -4,6 +4,7 @@ from os import getenv, makedirs, path
 from dotenv import load_dotenv
 from servicios.resolver_rutas import resource_path
 from controlador.lectura_archivo_controlador import etl_dda_controlador
+from infraestructura.cliente_correo import ClienteCorreo
 from vista.logger import Logger
 
 
@@ -30,6 +31,9 @@ if __name__ == "__main__":
     except Exception:
         obj_log.error(f"Error inesperado:\n{traceback.format_exc()}")
         exito = False
+
+    if not exito:
+        ClienteCorreo().enviar_alerta_fallo(obj_log.log_ejecucion_actual())
 
     obj_log.fin_ejecucion(exito)
 
