@@ -22,13 +22,11 @@ class etl_dda_controlador:
             if self.resultado_descarga["estado"]:
                 self.obj_log.log("Archivo descargado exitosamente.")
                 return True
-                break
             else:
                 self.obj_log.error(
                     f"{self.resultado_descarga['error']} Intento {contador + 1} de {self.intentos_descarga}."
                 )
                 contador += 1
-                continue
         return False
 
     def procesar_reporte_dda(self):

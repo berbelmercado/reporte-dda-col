@@ -14,6 +14,7 @@ Dependencias:
 - vista.logger.Logger
 - servicios.resolver_rutas.resource_path
 - os.getenv
+- os.listdir
 - os.path
 - os.remove
 - modelo.inserta_datos.InsertaDatos
@@ -22,9 +23,8 @@ Dependencias:
 import pandas as pd
 from vista.logger import Logger
 from servicios.resolver_rutas import resource_path
-from os import getenv, path, remove
+from os import getenv, listdir, path, remove
 from modelo.inserta_datos import InsertaDatos
-import os
 
 
 class ProcesarArchivo:
@@ -121,22 +121,8 @@ class ProcesarArchivo:
             # Registramos log
             self.obj_log.error(f"Error al eliminar el archivo {err}\n")
 
-    def validar_archivo(self):
-        """
-        Verifica si el archivo de reporte existe.
-
-        Returns:
-        --------
-        bool
-            True si el archivo existe, False en caso contrario.
-        """
-        if path.exists(self.archivo_reporte):
-            return True
-        else:
-            return False
-
     def listar_archivos(self, recursos) -> str:
-        for elemento in os.listdir(recursos):
-            ruta_completa = os.path.join(recursos, elemento)
-            if os.path.isfile(ruta_completa):
+        for elemento in listdir(recursos):
+            ruta_completa = path.join(recursos, elemento)
+            if path.isfile(ruta_completa):
                 return ruta_completa

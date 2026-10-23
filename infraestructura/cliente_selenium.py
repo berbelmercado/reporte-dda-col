@@ -15,13 +15,11 @@ from selenium.common.exceptions import StaleElementReferenceException
 from webdriver_manager.chrome import ChromeDriverManager
 from servicios.resolver_rutas import resource_path
 from vista.logger import Logger
-from modelo.procesar_archivo import ProcesarArchivo
 
 
 _WAIT_IMPLICIT = 30
 _WAIT_SHORT = 3
 _WAIT_LOGIN = 10
-_WAIT_REPORT = 20
 _WAIT_DOWNLOAD = 15
 _WAIT_EXPLICIT = 30
 
@@ -54,7 +52,6 @@ class ClienteSelenium:
         self.modo_oculto = getenv("MODO_OCULTO") == "True"
 
         self.obj_log = Logger()
-        self.obj_procesar_archivo = ProcesarArchivo()
 
     # ------------------------------------------------------------------
     # MÉTODO PRINCIPAL

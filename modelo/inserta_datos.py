@@ -11,13 +11,11 @@ Clases:
 Dependencias:
 -------------
 - pyodbc
-- pandas
 - os.getenv
 - vista.logger.Logger
 """
 
 import pyodbc
-import pandas
 from os import getenv
 from vista.logger import Logger
 
@@ -116,7 +114,6 @@ class InsertaDatos:
         """
         try:
             types = df.dtypes.values.tolist()
-            types
             size = []
 
             for i in types:
@@ -126,8 +123,6 @@ class InsertaDatos:
                     size.append([(pyodbc.SQL_WVARCHAR, 255, 0)])
                 if i == "float64":
                     size.append([pyodbc.SQL_DOUBLE])
-                if i == "datetime64":
-                    size.append([pyodbc.SQL_TYPE_DATE])
                 if (i == "<M8[ns]") or (i == "datetime64[ns]"):
                     size.append([pyodbc.SQL_TYPE_DATE])
                 if i == "bool":
