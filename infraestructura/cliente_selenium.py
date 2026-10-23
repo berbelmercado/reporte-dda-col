@@ -193,7 +193,11 @@ class ClienteSelenium:
     def _crear_servicio_driver(self):
         try:
             return Service(ChromeDriverManager().install())
-        except Exception:
+        except Exception as ex:
+            self.obj_log.error(
+                f"No se pudo actualizar el webdriver automáticamente: {ex}. "
+                f"Se usa el driver local: {self.ruta_driver}"
+            )
             return Service(executable_path=self.ruta_driver)
 
     def _crear_opciones(self):
