@@ -73,27 +73,46 @@ class InsertaDatos:
             self.obj_log.error(f"Error en la conexión a la base de datos: {err}")
             return False
 
-    def insertar_datos(self, dataframe) -> None:
+    def insertar_datos(self, dataframe) -> bool:
         """
-        Inserta los datos de un DataFrame en la tabla temporal de la base de datos.
+        Inserta los datos de un DataFrame en la tabla temporal y ejecuta el delta.
+
+        Todo ocurre en una sola transacción: si algún paso falla, se deshace
+        y la tabla temporal queda como estaba.
 
         Parámetros:
         -----------
         dataframe : pandas.DataFrame
             DataFrame que contiene los datos a insertar.
+
+        Returns:
+        --------
+        bool
+            True si la inserción y el delta terminan bien, False en caso contrario.
         """
-        query_sql = f"INSERT INTO DATASTEWARD..reporte_dda_temp VALUES (?,?)"
+        query_sql = "INSERT INTO DATASTEWARD..reporte_dda_temp VALUES (?,?)"
 
         try:
-            self.cursor.setinputsizes(self.typeToSize(dataframe))
-            self.cursor.executemany(query_sql, dataframe.values.tolist())
+            # Limpia restos de corridas anteriores que hayan fallado
+            self.cursor.execute("DELETE FROM DATASTEWARD..reporte_dda_temp")
+            if dataframe.empty:
+                self.obj_log.log("El archivo no tiene registros de Delivery")
+            else:
+                self.cursor.setinputsizes(self.typeToSize(dataframe))
+                self.cursor.executemany(query_sql, dataframe.values.tolist())
             self.delta_data()
-            self.cursor.commit()
+            self.cnx.commit()
             self.obj_log.log("Insersión de datos exitosa")
+            return True
         except Exception as e:
+            try:
+                self.cnx.rollback()
+            except Exception:
+                pass
             self.obj_log.error(
-                f"Error al insertar información a la base de datos: {e}\n"
+                f"Error al insertar información a la base de datos, se deshacen los cambios: {e}\n"
             )
+            return False
         finally:
             self.cursor.close()
             self.cnx.close()
@@ -133,19 +152,23 @@ class InsertaDatos:
 
     def delta_data(self):
         """
-        Ejecuta una consulta SQL para mover los datos de la tabla temporal a la tabla principal y limpiar la tabla temporal.
+        Copia a la tabla principal los VIN que aún no existen y limpia la tabla temporal.
+
+        Si un VIN viene repetido en el archivo se inserta una sola vez, con la
+        fecha de entrega más reciente. Los errores se propagan para que
+        insertar_datos deshaga la transacción.
         """
-        try:
-            # Consulta SQL
-            sql_query = f""" INSERT INTO DATASTEWARD..reporte_dda (vin,fecha_entrega,fecha_registro)
-                            SELECT vin,fecha_entrega,GETDATE() FROM DATASTEWARD..reporte_dda_temp
-                            WHERE vin NOT IN (SELECT vin FROM  DATASTEWARD..reporte_dda)
-                        """
-            sql_query_limpiar = f"""DELETE [DATASTEWARD].[dbo].[reporte_dda_temp]
-                                """
-            # Ejecutamos consulta
-            self.cursor.execute(sql_query)
-            self.cursor.execute(sql_query_limpiar)
-            self.obj_log.log("Se ejecuta Delta correctamente")
-        except Exception as ex:
-            self.obj_log.error(f"Error en Delta {ex}\n")
+        sql_query = """INSERT INTO DATASTEWARD..reporte_dda (vin, fecha_entrega, fecha_registro)
+                        SELECT t.vin, MAX(t.fecha_entrega), GETDATE()
+                        FROM DATASTEWARD..reporte_dda_temp t
+                        WHERE t.vin IS NOT NULL
+                          AND NOT EXISTS (SELECT 1 FROM DATASTEWARD..reporte_dda d
+                                          WHERE d.vin = t.vin)
+                        GROUP BY t.vin
+                    """
+        sql_query_limpiar = "DELETE FROM DATASTEWARD..reporte_dda_temp"
+
+        self.cursor.execute(sql_query)
+        nuevos = self.cursor.rowcount
+        self.cursor.execute(sql_query_limpiar)
+        self.obj_log.log(f"Se ejecuta Delta correctamente: {nuevos} VIN nuevos")

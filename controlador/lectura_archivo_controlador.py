@@ -29,10 +29,10 @@ class etl_dda_controlador:
                 contador += 1
         return False
 
-    def procesar_reporte_dda(self):
+    def procesar_reporte_dda(self) -> bool:
         if self.descarga_proceso_reporte_dda():
-            self.obj_procesar_archivo.leer_modificar_archivo()
-        else:
-            self.obj_log.error(
-                "No se pudo descargar el archivo después de varios intentos."
-            )
+            return self.obj_procesar_archivo.leer_modificar_archivo()
+        self.obj_log.error(
+            "No se pudo descargar el archivo después de varios intentos."
+        )
+        return False

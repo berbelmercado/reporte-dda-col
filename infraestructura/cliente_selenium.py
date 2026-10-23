@@ -1,6 +1,6 @@
 import time
 from contextlib import contextmanager
-from os import environ, getenv
+from os import environ, getenv, listdir, path, remove
 from urllib.parse import quote
 
 from selenium import webdriver
@@ -20,7 +20,7 @@ from vista.logger import Logger
 _WAIT_IMPLICIT = 30
 _WAIT_SHORT = 3
 _WAIT_LOGIN = 10
-_WAIT_DOWNLOAD = 15
+_WAIT_DOWNLOAD = 120  # máximo para que termine la descarga
 _WAIT_EXPLICIT = 30
 
 
@@ -60,6 +60,7 @@ class ClienteSelenium:
     def descargar_archivo_dda(self) -> dict:
         driver = None
         try:
+            self._limpiar_descargas_parciales()
             driver = webdriver.Chrome(
                 service=self._crear_servicio_driver(), options=self._crear_opciones()
             )
@@ -126,7 +127,7 @@ class ClienteSelenium:
                 )
             ).click()
 
-            time.sleep(_WAIT_DOWNLOAD)
+            self._esperar_descarga()
             driver.quit()
             return {"estado": True}
 
@@ -247,6 +248,31 @@ class ClienteSelenium:
             },
         )
         return options
+
+    def _archivos_descarga(self):
+        ruta = self.__ruta_descarga_reporte
+        return [a for a in listdir(ruta) if path.isfile(path.join(ruta, a))]
+
+    @staticmethod
+    def _es_parcial(nombre):
+        return nombre.endswith((".crdownload", ".tmp"))
+
+    def _limpiar_descargas_parciales(self):
+        """Borra descargas incompletas que haya dejado un intento anterior."""
+        for nombre in self._archivos_descarga():
+            if self._es_parcial(nombre):
+                remove(path.join(self.__ruta_descarga_reporte, nombre))
+                self.obj_log.log(f"Se elimina descarga incompleta: {nombre}")
+
+    def _esperar_descarga(self):
+        """Espera a que haya un archivo completo y ninguno a medio descargar."""
+        limite = time.time() + _WAIT_DOWNLOAD
+        while time.time() < limite:
+            archivos = self._archivos_descarga()
+            if archivos and not any(self._es_parcial(a) for a in archivos):
+                return
+            time.sleep(1)
+        raise TimeoutError(f"La descarga no terminó en {_WAIT_DOWNLOAD} segundos")
 
     def _permitir_descargas(self, driver):
         """En modo oculto, asegura que Chrome guarde las descargas en la carpeta del reporte."""

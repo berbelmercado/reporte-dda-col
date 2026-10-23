@@ -52,20 +52,35 @@ class ProcesarArchivo:
         self.dataframe_filtrado = pd.DataFrame()
         self.obj_inserta_datos = InsertaDatos()
 
-    def leer_modificar_archivo(self):
+    def leer_modificar_archivo(self) -> bool:
         """
-        Lee y procesa el archivo de reporte si no está vacío.
+        Lee y procesa el archivo de reporte.
+
+        Returns:
+        --------
+        bool
+            True si los datos se cargaron en la base de datos, False en caso contrario.
         """
 
         self.archivo_reporte = self.listar_archivos(self.recursos)
 
-        if not self.archivo_vacio():
-            try:
-                self.leer_archivo()
-            except Exception as ex:
-                self.obj_log.error(f"Error al leer el archivo: {ex}\n")
-            else:
-                self.procesar_archivo()
+        if self.archivo_reporte is None:
+            self.obj_log.error(f"No se encontró ningún archivo en {self.recursos}\n")
+            return False
+
+        # Si el archivo no sirve se elimina igual, para que no lo vuelva a leer la próxima corrida
+        if self.archivo_vacio():
+            self.eliminar_archivo()
+            return False
+
+        try:
+            self.leer_archivo()
+        except Exception as ex:
+            self.obj_log.error(f"Error al leer el archivo: {ex}\n")
+            self.eliminar_archivo()
+            return False
+
+        return self.procesar_archivo()
 
     def archivo_vacio(self):
         """
@@ -88,10 +103,16 @@ class ProcesarArchivo:
         self.dataframe = pd.read_excel(self.archivo_reporte)
         self.obj_log.log("Se lee correctamente el archivo")
 
-    def procesar_archivo(self):
+    def procesar_archivo(self) -> bool:
         """
         Filtra los datos del archivo y los inserta en la base de datos.
+
+        Returns:
+        --------
+        bool
+            True si la inserción terminó bien, False en caso contrario.
         """
+        exito = False
         try:
             # Filtramos los datos del archivo y lo guardamos en un nuevo Dataframe
             self.dataframe_filtrado = self.dataframe.loc[
@@ -100,7 +121,7 @@ class ProcesarArchivo:
             # Conectamos a la base de datos
             if self.obj_inserta_datos.conexion_sql():
                 # Insertamos los datos filtrados ala base de datos
-                self.obj_inserta_datos.insertar_datos(self.dataframe_filtrado)
+                exito = self.obj_inserta_datos.insertar_datos(self.dataframe_filtrado)
 
         except Exception as ex:
             # Registramos log
@@ -109,6 +130,8 @@ class ProcesarArchivo:
         finally:
             # Eliminamos archivo
             self.eliminar_archivo()
+
+        return exito
 
     def eliminar_archivo(self):
         """
