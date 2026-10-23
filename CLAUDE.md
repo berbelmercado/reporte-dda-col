@@ -36,6 +36,11 @@ Cross-cutting:
 - `servicios/resolver_rutas.resource_path` resolves paths against `sys._MEIPASS` when frozen by PyInstaller, else the CWD. Use it for every file path (`.env`, log, download dir, driver), and run from the repo root.
 - `vista/logger.Logger` wraps `logging.basicConfig` writing to `ARCHIVO_LOG`. Errors are logged and swallowed throughout rather than propagated, so check the log file to diagnose failures.
 
+Gotchas:
+- `DESCARGA_REPORTE` must hold only the downloaded report. `listar_archivos` picks the first file `os.listdir` returns, so any leftover file (for example a partial `.crdownload`) gets read and then deleted. If the folder is empty it returns `None`, and `archivo_vacio()` raises outside any `try`, so that is the one path that crashes instead of logging.
+- The temp-table insert is positional (`VALUES (?,?)`), so the DataFrame column order `VIN, End_Date` must match the column order of `reporte_dda_temp` (`vin, fecha_entrega`).
+- Behind the corporate proxy, `ChromeDriverManager().install()` can time out (`WinError 10060`) before it falls back to `RUTA_WEBDRIVER`. Keep a chromedriver that matches the installed Chrome version at that path.
+
 ## Configuration (.env)
 
 The README has a full `.env` template. Variables read by the code:
