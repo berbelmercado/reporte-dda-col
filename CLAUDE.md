@@ -47,7 +47,7 @@ Gotchas:
 
 The README has a full `.env` template. Variables read by the code:
 
-- General: `INTENTOS_DESCARGA`, `DESCARGA_REPORTE` (download dir, e.g. `Recursos`), `ARCHIVO_LOG` (e.g. `Log/log.txt`), `RUTA_WEBDRIVER`, `SSL_VERIFY` (`"True"` to activate the Chrome window for the client-certificate prompt via pygetwindow), `PROXY_HOST` (optional `host:port`; the chromedriver download goes through it with `IPN`/`CLAVE`, set via `HTTPS_PROXY` only while it runs, because Selenium also reads that variable)
+- General: `INTENTOS_DESCARGA`, `DESCARGA_REPORTE` (download dir, e.g. `Recursos`), `ARCHIVO_LOG` (e.g. `Log/log.txt`), `RUTA_WEBDRIVER`, `PROXY_HOST` (optional `host:port`; the chromedriver download goes through it with `IPN`/`CLAVE`, set via `HTTPS_PROXY` only while it runs, because Selenium also reads that variable), `MODO_OCULTO` (`"True"` runs Chrome headless at 1920x1080 and allows downloads via CDP `Browser.setDownloadBehavior`, so the scheduled task can run with no user logged on)
 - Portal: `RUTA_SPOTFIRE`, `IPN`, `CLAVE`, `ID_INPUT_IPN`, `ID_INPUT_CLAVE`, `XPATH_SIGUIENTE`, `XPATH_INGRESAR_CLAVE`, `XPATH_VERIFICAR`
 - Folder XPaths: `XPATH_CARPETA_DA3`, `XPATH_CARPETA_DESING`, `XPATH_CARPETA_COL`, `XPATH_CARPETA_REPORTS`, `XPATH_REPORTS_IN_PROGRES`, `XPATH_CARPETA_DDA`, `XPATH_CARP_COL_DS_DDA_COLOMBIA`
 - SQL Server: `SERVIDOR_SQL`, `USUARIO_SQL`, `CONTRASENA_SQL`, `BD_DATASTEWARD`

@@ -2,7 +2,6 @@ import time
 from contextlib import contextmanager
 from os import environ, getenv
 from urllib.parse import quote
-import pygetwindow as gw
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -51,8 +50,8 @@ class ClienteSelenium:
 
         self.ipn = getenv("IPN")
         self.clave = getenv("CLAVE")
-        self.validar_certificado = getenv("SSL_VERIFY")
         self.proxy_host = getenv("PROXY_HOST")
+        self.modo_oculto = getenv("MODO_OCULTO") == "True"
 
         self.obj_log = Logger()
         self.obj_procesar_archivo = ProcesarArchivo()
@@ -68,6 +67,7 @@ class ClienteSelenium:
                 service=self._crear_servicio_driver(), options=self._crear_opciones()
             )
             driver.implicitly_wait(_WAIT_IMPLICIT)
+            self._permitir_descargas(driver)
 
             wait = WebDriverWait(driver, _WAIT_EXPLICIT)
             acciones = ActionChains(driver)
@@ -82,7 +82,6 @@ class ClienteSelenium:
             ).click()
 
             time.sleep(_WAIT_LOGIN)
-            self._validar_certificado_servidor()
 
             wait.until(
                 EC.presence_of_element_located((By.ID, self.input_ipn))
@@ -236,6 +235,11 @@ class ClienteSelenium:
     def _crear_opciones(self):
         options = Options()
         options.add_experimental_option("detach", True)
+        if self.modo_oculto:
+            # Sin ventana, para correr como tarea programada sin sesión iniciada.
+            # El tamaño fijo evita que la página se dibuje distinto y fallen los XPath.
+            options.add_argument("--headless=new")
+            options.add_argument("--window-size=1920,1080")
         options.add_experimental_option(
             "prefs",
             {
@@ -247,6 +251,15 @@ class ClienteSelenium:
         )
         return options
 
+    def _permitir_descargas(self, driver):
+        """En modo oculto, asegura que Chrome guarde las descargas en la carpeta del reporte."""
+        if not self.modo_oculto:
+            return
+        driver.execute_cdp_cmd(
+            "Browser.setDownloadBehavior",
+            {"behavior": "allow", "downloadPath": self.__ruta_descarga_reporte},
+        )
+
     def _aceptar_sitio_no_seguro(self, driver):
         if self.validar_exitencia(driver, "details-button", "ID"):
             WebDriverWait(driver, _WAIT_EXPLICIT).until(
@@ -255,13 +268,6 @@ class ClienteSelenium:
             WebDriverWait(driver, _WAIT_EXPLICIT).until(
                 EC.element_to_be_clickable((By.ID, "proceed-link"))
             ).click()
-
-    def _validar_certificado_servidor(self):
-        if self.validar_certificado != "True":
-            return
-        ventanas = [w for w in gw.getWindowsWithTitle("Chrome") if not w.isActive]
-        if ventanas:
-            ventanas[0].activate()
 
     def validar_exitencia(self, nav_driver, identificador, tipo_id):
         try:
