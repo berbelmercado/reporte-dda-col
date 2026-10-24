@@ -1,6 +1,7 @@
 import time
-from os import getenv
-import pygetwindow as gw
+from contextlib import contextmanager
+from os import environ, getenv, listdir, path, remove
+from urllib.parse import quote
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -9,20 +10,18 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import StaleElementReferenceException
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 
 from webdriver_manager.chrome import ChromeDriverManager
-from servicios.resolver_rutas import resource_path
+from servicios.resolver_rutas import es_excel, resource_path
 from vista.logger import Logger
-from modelo.procesar_archivo import ProcesarArchivo
 
 
-_WAIT_IMPLICIT = 30
 _WAIT_SHORT = 3
-_WAIT_LOGIN = 10
-_WAIT_REPORT = 20
-_WAIT_DOWNLOAD = 15
+_WAIT_DOWNLOAD = 120  # máximo para que termine la descarga
 _WAIT_EXPLICIT = 30
+_WAIT_TABLA = 10  # tras el primer clic en el reporte, antes de repetirlo
+_REINTENTOS_CLIC = 3
 
 
 class ClienteSelenium:
@@ -49,10 +48,10 @@ class ClienteSelenium:
 
         self.ipn = getenv("IPN")
         self.clave = getenv("CLAVE")
-        self.validar_certificado = getenv("SSL_VERIFY")
+        self.proxy_host = getenv("PROXY_HOST")
+        self.modo_oculto = getenv("MODO_OCULTO") == "True"
 
         self.obj_log = Logger()
-        self.obj_procesar_archivo = ProcesarArchivo()
 
     # ------------------------------------------------------------------
     # MÉTODO PRINCIPAL
@@ -61,13 +60,18 @@ class ClienteSelenium:
     def descargar_archivo_dda(self) -> dict:
         driver = None
         try:
+            inicio = time.monotonic()
+            self._vaciar_carpeta_descarga()
             driver = webdriver.Chrome(
                 service=self._crear_servicio_driver(), options=self._crear_opciones()
             )
-            driver.implicitly_wait(_WAIT_IMPLICIT)
+            # Sin espera implícita: todas las búsquedas usan esperas explícitas.
+            # Mezclar ambas hacía que validar_exitencia tardara hasta 30 s en vez de 3.
+            self._permitir_descargas(driver)
 
             wait = WebDriverWait(driver, _WAIT_EXPLICIT)
             acciones = ActionChains(driver)
+            self._marcar_tiempo("Navegador iniciado", inicio)
 
             driver.get(self.url_sopotfire)
             self._aceptar_sitio_no_seguro(driver)
@@ -78,9 +82,7 @@ class ClienteSelenium:
                 )
             ).click()
 
-            time.sleep(_WAIT_LOGIN)
-            self._validar_certificado_servidor()
-
+            # La espera explícita del campo IPN cubre la redirección al login
             wait.until(
                 EC.presence_of_element_located((By.ID, self.input_ipn))
             ).send_keys(self.ipn)
@@ -90,32 +92,18 @@ class ClienteSelenium:
                 EC.presence_of_element_located((By.ID, self.input_clave))
             ).send_keys(self.clave)
             wait.until(EC.element_to_be_clickable((By.XPATH, self.verificar))).click()
+            self._marcar_tiempo("Login completado", inicio)
 
             self._navegar_carpetas(wait, acciones)
             self._cambiar_ventana(driver)
 
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            time.sleep(2)
+            self._marcar_tiempo("Reporte abierto", inicio)
 
-            wait.until(
-                EC.element_to_be_clickable(
-                    (
-                        By.XPATH,
-                        "/html/body/div/div[2]/div/div[1]/div/div/div[1]/div/div[1]/div/div/div[2]/div[1]/div[1]/div[2]",
-                    )
-                )
-            ).click()
+            self._abrir_menu_tabla(driver, wait, acciones)
 
-            self.context_click_safe(
-                wait,
-                acciones,
-                (
-                    By.XPATH,
-                    "/html/body/div[1]/div[2]/div/div[1]/div/div/div[1]/div/div[2]"
-                    "/div/div/div/div/div/div/div/div/div[1]/div[1]",
-                ),
-            )
-
+            # Lo que ya esté en la carpeta antes de exportar no cuenta como la descarga
+            previos = set(self._archivos_descarga())
             wait.until(
                 EC.element_to_be_clickable(
                     (By.XPATH, "/html/body/div[2]/div[1]/div[1]/div")
@@ -126,8 +114,10 @@ class ClienteSelenium:
                     (By.XPATH, "/html/body/div[3]/div[1]/div[2]/div")
                 )
             ).click()
+            self._marcar_tiempo("Exportación solicitada", inicio)
 
-            time.sleep(_WAIT_DOWNLOAD)
+            self._esperar_descarga(previos)
+            self._marcar_tiempo("Descarga completa", inicio)
             driver.quit()
             return {"estado": True}
 
@@ -182,6 +172,37 @@ class ClienteSelenium:
         for ruta in rutas:
             self.double_click_safe(wait, acciones, (By.XPATH, ruta))
 
+    def _abrir_menu_tabla(self, driver, wait, acciones):
+        """Selecciona la tabla del reporte y abre su menú contextual.
+
+        Reemplaza la pausa fija de 2 s antes del primer clic: si Spotfire aún no
+        respondió y la tabla no aparece, se repite el clic en vez de esperar siempre.
+        """
+        primer_clic = (
+            By.XPATH,
+            "/html/body/div/div[2]/div/div[1]/div/div/div[1]/div/div[1]/div/div/div[2]/div[1]/div[1]/div[2]",
+        )
+        tabla = (
+            By.XPATH,
+            "/html/body/div[1]/div[2]/div/div[1]/div/div/div[1]/div/div[2]"
+            "/div/div/div/div/div/div/div/div/div[1]/div[1]",
+        )
+        for intento in range(1, _REINTENTOS_CLIC + 1):
+            try:
+                wait.until(EC.element_to_be_clickable(primer_clic)).click()
+                WebDriverWait(driver, _WAIT_TABLA).until(EC.element_to_be_clickable(tabla))
+                break
+            except (TimeoutException, StaleElementReferenceException):
+                if intento == _REINTENTOS_CLIC:
+                    raise
+                self.obj_log.log(
+                    f"La tabla del reporte aún no responde, se repite el clic ({intento})"
+                )
+        self.context_click_safe(wait, acciones, tabla)
+
+    def _marcar_tiempo(self, etapa, inicio):
+        self.obj_log.log(f"{etapa} ({time.monotonic() - inicio:.0f} s)")
+
     def _cambiar_ventana(self, driver):
         original = driver.current_window_handle
         WebDriverWait(driver, _WAIT_EXPLICIT).until(lambda d: len(d.window_handles) > 1)
@@ -192,13 +213,52 @@ class ClienteSelenium:
 
     def _crear_servicio_driver(self):
         try:
-            return Service(ChromeDriverManager().install())
-        except Exception:
+            with self._proxy_temporal():
+                return Service(ChromeDriverManager().install())
+        except Exception as ex:
+            self.obj_log.error(
+                f"No se pudo actualizar el webdriver automáticamente: {ex}. "
+                f"Se usa el driver local: {self.ruta_driver}"
+            )
             return Service(executable_path=self.ruta_driver)
+
+    @contextmanager
+    def _proxy_temporal(self):
+        """Activa el proxy corporativo solo durante la descarga del webdriver.
+
+        Se restauran las variables al salir porque Selenium también las lee y
+        enviaría por el proxy su conexión local con chromedriver.
+        """
+        if not self.proxy_host:
+            yield
+            return
+
+        usuario = quote(self.ipn or "", safe="")
+        clave = quote(self.clave or "", safe="")
+        url_proxy = f"http://{usuario}:{clave}@{self.proxy_host}"
+        variables = ("HTTPS_PROXY", "HTTP_PROXY")
+        originales = {var: environ.get(var) for var in variables}
+
+        self.obj_log.log(f"Descargando webdriver a través del proxy {self.proxy_host}")
+        try:
+            for var in variables:
+                environ[var] = url_proxy
+            yield
+        finally:
+            for var, valor in originales.items():
+                if valor is None:
+                    environ.pop(var, None)
+                else:
+                    environ[var] = valor
 
     def _crear_opciones(self):
         options = Options()
         options.add_experimental_option("detach", True)
+        if self.modo_oculto:
+            # Sin ventana, para correr como tarea programada sin sesión iniciada.
+            # El tamaño fijo evita que la página se dibuje distinto y fallen los XPath.
+            options.add_argument("--headless=new")
+            options.add_argument("--window-size=1920,1080")
         options.add_experimental_option(
             "prefs",
             {
@@ -210,6 +270,66 @@ class ClienteSelenium:
         )
         return options
 
+    def _archivos_descarga(self):
+        ruta = self.__ruta_descarga_reporte
+        return [a for a in listdir(ruta) if path.isfile(path.join(ruta, a))]
+
+    def _describir_archivos(self, nombres):
+        ruta = self.__ruta_descarga_reporte
+        return ", ".join(
+            f"{n} ({path.getsize(path.join(ruta, n))} bytes)" for n in sorted(nombres)
+        )
+
+    def _vaciar_carpeta_descarga(self):
+        """Borra todo lo que haya en la carpeta de descarga antes de un intento.
+
+        Así solo puede quedar el archivo que se descargue en este intento. Las
+        subcarpetas (como rechazados) no se tocan.
+        """
+        archivos = self._archivos_descarga()
+        if not archivos:
+            return
+        self.obj_log.log(
+            f"Se vacía la carpeta de descarga: {self._describir_archivos(archivos)}"
+        )
+        for nombre in archivos:
+            remove(path.join(self.__ruta_descarga_reporte, nombre))
+
+    def _esperar_descarga(self, previos):
+        """Espera a que aparezca un Excel nuevo en la carpeta de descarga.
+
+        Chrome solo le da el nombre final al archivo cuando termina de bajarlo,
+        así que un .xlsx nuevo ya está completo. Otros archivos (Chrome baja
+        paquetes de extensiones como downloads.htm a la misma carpeta) se ignoran.
+
+        Parámetros:
+        -----------
+        previos : set
+            Archivos que ya estaban en la carpeta antes de exportar.
+        """
+        limite = time.time() + _WAIT_DOWNLOAD
+        while time.time() < limite:
+            archivos = self._archivos_descarga()
+            nuevos = [a for a in archivos if a not in previos and es_excel(a)]
+            if nuevos:
+                if len(archivos) > 1:
+                    self.obj_log.log(
+                        f"Hay más de un archivo en la carpeta de descarga: "
+                        f"{self._describir_archivos(archivos)}"
+                    )
+                return
+            time.sleep(1)
+        raise TimeoutError(f"La descarga no terminó en {_WAIT_DOWNLOAD} segundos")
+
+    def _permitir_descargas(self, driver):
+        """En modo oculto, asegura que Chrome guarde las descargas en la carpeta del reporte."""
+        if not self.modo_oculto:
+            return
+        driver.execute_cdp_cmd(
+            "Browser.setDownloadBehavior",
+            {"behavior": "allow", "downloadPath": self.__ruta_descarga_reporte},
+        )
+
     def _aceptar_sitio_no_seguro(self, driver):
         if self.validar_exitencia(driver, "details-button", "ID"):
             WebDriverWait(driver, _WAIT_EXPLICIT).until(
@@ -218,13 +338,6 @@ class ClienteSelenium:
             WebDriverWait(driver, _WAIT_EXPLICIT).until(
                 EC.element_to_be_clickable((By.ID, "proceed-link"))
             ).click()
-
-    def _validar_certificado_servidor(self):
-        if self.validar_certificado != "True":
-            return
-        ventanas = [w for w in gw.getWindowsWithTitle("Chrome") if not w.isActive]
-        if ventanas:
-            ventanas[0].activate()
 
     def validar_exitencia(self, nav_driver, identificador, tipo_id):
         try:

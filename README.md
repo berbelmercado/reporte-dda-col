@@ -84,17 +84,56 @@ pip install -r requerimientos.txt
 Crea un archivo `.env` en la raíz del proyecto:
 
 ```env
-# Credenciales del portal web
-PORTAL_URL=https://portal.sofasa.com
-PORTAL_USER=tu_usuario
-PORTAL_PASSWORD=tu_contraseña
+# General
+INTENTOS_DESCARGA=3
+DESCARGA_REPORTE=Recursos
+ARCHIVO_LOG=Log/log.txt
+RUTA_WEBDRIVER=chromedriver.exe
+PROXY_HOST=host_proxy:puerto
+MODO_OCULTO=True
+
+# Portal Spotfire: URL y credenciales
+RUTA_SPOTFIRE=https://portal.sofasa.com
+IPN=tu_ipn
+CLAVE=tu_contraseña
+
+# Portal Spotfire: selectores del login
+ID_INPUT_IPN=id_campo_ipn
+ID_INPUT_CLAVE=id_campo_clave
+XPATH_SIGUIENTE=xpath_boton_siguiente
+XPATH_INGRESAR_CLAVE=xpath_opcion_clave
+XPATH_VERIFICAR=xpath_boton_verificar
+
+# Portal Spotfire: XPaths de la ruta de carpetas hasta el reporte (en orden)
+XPATH_CARPETA_DA3=xpath_carpeta_da3
+XPATH_CARPETA_DESING=xpath_carpeta_desing
+XPATH_CARPETA_COL=xpath_carpeta_col
+XPATH_CARPETA_REPORTS=xpath_carpeta_reports
+XPATH_REPORTS_IN_PROGRES=xpath_carpeta_reports_in_progress
+XPATH_CARPETA_DDA=xpath_carpeta_dda
+XPATH_CARP_COL_DS_DDA_COLOMBIA=xpath_reporte_ds_dda_colombia
 
 # SQL Server
-DB_SERVER=tu_servidor
-DB_NAME=tu_base_de_datos
-DB_USER=usuario_db
-DB_PASSWORD=contraseña_db
+SERVIDOR_SQL=tu_servidor
+BD_DATASTEWARD=tu_base_de_datos
+USUARIO_SQL=usuario_db
+CONTRASENA_SQL=contraseña_db
+
+# Alerta por correo cuando una ejecución falla (relay SMTP sin usuario ni cifrado)
+CORREO_REMITENTE=remitente@dominio.com
+SERVIDOR_SMTP=ip_o_host_smtp
+PUERTO_SERVIDOR_SMTP=25
+DESTINATARIO=correo1@dominio.com,correo2@dominio.com
 ```
+
+- `INTENTOS_DESCARGA`: número de reintentos de descarga.
+- `DESCARGA_REPORTE`: carpeta donde Chrome guarda el reporte descargado.
+- `ARCHIVO_LOG`: ruta del archivo de log.
+- `RUTA_WEBDRIVER`: chromedriver local, usado solo si `webdriver-manager` no logra descargar uno.
+- `PROXY_HOST`: proxy corporativo (`host:puerto`) para descargar el chromedriver, autenticado con `IPN`/`CLAVE`. Opcional: si está vacío, se descarga sin proxy.
+- `MODO_OCULTO`: con `True`, Chrome corre sin ventana (headless, 1920x1080). Así la tarea programada puede ejecutarse sin sesión iniciada. Use `False` para ver el navegador al depurar.
+- `CORREO_REMITENTE`, `SERVIDOR_SMTP`, `PUERTO_SERVIDOR_SMTP`: relay SMTP para la alerta de fallo. Se conecta sin usuario, sin contraseña y sin cifrado.
+- `DESTINATARIO`: uno o varios correos separados por coma. Si la ejecución termina con errores, se envía un solo correo con el log de esa corrida adjunto.
 
 >  El archivo `.env` está excluido por `.gitignore`. Nunca lo subas al repositorio.
 >  Crear la carpeta Log

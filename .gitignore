@@ -205,3 +205,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Datos del servidor de correo (ya copiados al .env)
+SMTP.txt
