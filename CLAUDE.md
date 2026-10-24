@@ -16,7 +16,7 @@ python main.py                  # runs the full pipeline (needs .env, portal acc
 pyinstaller main.spec           # production build, deployed as a Windows scheduled task
 ```
 
-The local `main.spec` (gitignored by `*.spec`) is a one-folder build (`COLLECT`, output in `dist/main/`) that bundles `.env` via `datas=[('.env', '.')]`. The README still says `pyinstaller --onefile main.py`; avoid that: it does not bundle `.env`, and in one-file mode `sys._MEIPASS` is a temp dir deleted on exit, so the log and download folder (resolved through `resource_path`) would vanish with it. In the one-folder build they live under `dist/main/_internal/`.
+The local `main.spec` (gitignored by `*.spec`) is a one-folder build (`COLLECT`, output in `dist/main/`) that bundles `.env` via `datas=[('.env', '.')]`. On a fresh clone, generate it with the command in the README (`pyinstaller --noconfirm --name main --add-data ".env;." main.py`). Never use `--onefile`: in one-file mode `sys._MEIPASS` is a temp dir deleted on exit, so the log and download folder (resolved through `resource_path`) would vanish with it. In the one-folder build they live under `dist/main/_internal/`.
 
 There are no tests, linter config, or CI. The only way to exercise the pipeline end-to-end is a real run against the portal and database.
 

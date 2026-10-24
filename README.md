@@ -136,8 +136,7 @@ DESTINATARIO=correo1@dominio.com,correo2@dominio.com
 - `DESTINATARIO`: uno o varios correos separados por coma. Si la ejecución termina con errores, se envía un solo correo con el log de esa corrida adjunto.
 
 >  El archivo `.env` está excluido por `.gitignore`. Nunca lo subas al repositorio.
->  Crear la carpeta Log
->  Crear la carpeta Recursos
+>  Las carpetas del log y de descarga se crean solas al iniciar.
 ### 4. Ejecutar
 
 ```bash
@@ -148,12 +147,21 @@ python main.py
 
 ##  Despliegue en producción
 
-El sistema está diseñado para ejecutarse como tarea programada en Windows. Para generar el ejecutable:
+El sistema está diseñado para ejecutarse como tarea programada en Windows. Para generar el ejecutable (en modo carpeta, con el `.env` incluido):
 
 ```bash
-pyinstaller --onefile main.py
+pyinstaller --noconfirm --name main --add-data ".env;." main.py
 ```
 
-El `.exe` resultante puede desplegarse en cualquier servidor Windows sin necesidad de instalar Python ni las dependencias.
+La primera vez, ese comando crea `main.spec` (excluido por `.gitignore`). Las siguientes veces basta con `pyinstaller --noconfirm main.spec`.
+
+No uses `--onefile`. En ese modo el programa se descomprime en una carpeta temporal que se borra al terminar, y con ella se perderían el log y la carpeta de descarga.
+
+El resultado queda en `dist\main\`. Copia la carpeta completa al servidor; no hace falta instalar Python ni las dependencias. El log y la carpeta de descarga quedan en `dist\main\_internal\`.
+
+En el Programador de tareas:
+- Programa `main.exe` de esa carpeta.
+- Marca "Ejecutar tanto si el usuario inició sesión como si no" y guarda la contraseña. Para eso el `.env` debe tener `MODO_OCULTO=True`.
+- Una ejecución con errores termina con código 1, así que aparece como fallida en el historial de la tarea.
 
 
