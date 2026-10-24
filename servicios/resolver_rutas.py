@@ -9,3 +9,10 @@ def resource_path(ruta_relativa):
     except Exception:
         base_path = os.path.abspath(".")
     return os.path.join(base_path,ruta_relativa)
+
+_EXTENSIONES_EXCEL = (".xlsx", ".xls")
+
+
+def es_excel(nombre):
+    """Indica si el nombre corresponde a un archivo de Excel (el reporte DDA)."""
+    return nombre.lower().endswith(_EXTENSIONES_EXCEL)

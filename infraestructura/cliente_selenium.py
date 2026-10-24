@@ -13,7 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 
 from webdriver_manager.chrome import ChromeDriverManager
-from servicios.resolver_rutas import resource_path
+from servicios.resolver_rutas import es_excel, resource_path
 from vista.logger import Logger
 
 
@@ -274,10 +274,6 @@ class ClienteSelenium:
         ruta = self.__ruta_descarga_reporte
         return [a for a in listdir(ruta) if path.isfile(path.join(ruta, a))]
 
-    @staticmethod
-    def _es_parcial(nombre):
-        return nombre.endswith((".crdownload", ".tmp"))
-
     def _describir_archivos(self, nombres):
         ruta = self.__ruta_descarga_reporte
         return ", ".join(
@@ -300,7 +296,11 @@ class ClienteSelenium:
             remove(path.join(self.__ruta_descarga_reporte, nombre))
 
     def _esperar_descarga(self, previos):
-        """Espera a que aparezca un archivo nuevo completo y ninguno a medio descargar.
+        """Espera a que aparezca un Excel nuevo en la carpeta de descarga.
+
+        Chrome solo le da el nombre final al archivo cuando termina de bajarlo,
+        así que un .xlsx nuevo ya está completo. Otros archivos (Chrome baja
+        paquetes de extensiones como downloads.htm a la misma carpeta) se ignoran.
 
         Parámetros:
         -----------
@@ -310,8 +310,8 @@ class ClienteSelenium:
         limite = time.time() + _WAIT_DOWNLOAD
         while time.time() < limite:
             archivos = self._archivos_descarga()
-            nuevos = [a for a in archivos if a not in previos and not self._es_parcial(a)]
-            if nuevos and not any(self._es_parcial(a) for a in archivos):
+            nuevos = [a for a in archivos if a not in previos and es_excel(a)]
+            if nuevos:
                 if len(archivos) > 1:
                     self.obj_log.log(
                         f"Hay más de un archivo en la carpeta de descarga: "

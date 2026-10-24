@@ -22,7 +22,7 @@ Dependencias:
 
 import pandas as pd
 from vista.logger import Logger
-from servicios.resolver_rutas import resource_path
+from servicios.resolver_rutas import es_excel, resource_path
 from datetime import datetime
 from os import getenv, listdir, makedirs, path, remove, replace
 from modelo.inserta_datos import InsertaDatos
@@ -69,7 +69,7 @@ class ProcesarArchivo:
         self.archivo_reporte = self.listar_archivos(self.recursos)
 
         if self.archivo_reporte is None:
-            self.obj_log.error(f"No se encontró ningún archivo en {self.recursos}\n")
+            self.obj_log.error(f"No se encontró ningún archivo Excel en {self.recursos}\n")
             return False
 
         # Si el archivo no sirve se aparta en "rechazados" para revisarlo sin volver a leerlo
@@ -174,22 +174,24 @@ class ProcesarArchivo:
 
     def listar_archivos(self, recursos) -> str:
         """
-        Devuelve el archivo más reciente de la carpeta (sin entrar en subcarpetas),
-        o None si no hay ninguno. Si hay varios, los registra en el log.
+        Devuelve el Excel más reciente de la carpeta (sin entrar en subcarpetas),
+        o None si no hay ninguno. Los demás archivos se ignoran. Si hay varios
+        archivos, los registra en el log.
         """
         archivos = [
             path.join(recursos, elemento)
             for elemento in listdir(recursos)
             if path.isfile(path.join(recursos, elemento))
         ]
-        if not archivos:
-            return None
         if len(archivos) > 1:
             detalle = ", ".join(
                 f"{path.basename(a)} ({path.getsize(a)} bytes)" for a in sorted(archivos)
             )
             self.obj_log.log(f"Hay varios archivos en {recursos}: {detalle}")
-        elegido = max(archivos, key=path.getmtime)
+        excels = [a for a in archivos if es_excel(path.basename(a))]
+        if not excels:
+            return None
+        elegido = max(excels, key=path.getmtime)
         if len(archivos) > 1:
             self.obj_log.log(f"Se usa el más reciente: {path.basename(elegido)}")
         return elegido
